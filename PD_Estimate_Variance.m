@@ -333,7 +333,7 @@ guessIdx = fullfact([numel(sigguess) numel(angs)]);
 % Fit using a variety of initial guesses
 for rot = 1:size(guessIdx,1)
     paramsGuess = [Aguess 1/sigguess(guessIdx(rot,1)) 1/sigguess(guessIdx(rot,1)) 0 expguess blguess angs(guessIdx(rot,2)) kappaguess];
-    [f1,fval] = fmincon('FitNakaRushtonFunJPW',paramsGuess,a,b,[],[],lb,ub,[],options,[Lcc Mcc],nsp,surfpanel.surftype,surfpanel.errortype);
+    [f1,fval] = fmincon('FitModel',paramsGuess,a,b,[],[],lb,ub,[],options,[Lcc Mcc],nsp,surfpanel.surftype,surfpanel.errortype);
     params(rot,:) = f1;
     GOF(rot) = fval;
 end
