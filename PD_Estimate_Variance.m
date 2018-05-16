@@ -1,6 +1,6 @@
 
 function PD_Estimate_Variance()
-close all
+global data
 
 % This script models the responses of LN neurons tuned to various 
 % directions in the LM plane. By fitting the modeled responses, we can 
@@ -25,22 +25,13 @@ conpanel.uicontrols.nsamps = uicontrol('style','edit','parent',modelfig.conpanel
 conpanel.labels.nsamps = uicontrol('Parent',modelfig.conpanel,'Units','normalized',...
     'pos',[.55 .88 .4 .1],'HorizontalAlignment','center',...
     'style','text','string','Samples/preferred direction','FontSize',10);
-% conpanel.uicontrols.npresstim = uicontrol('parent',modelfig.conpanel,'units','normalized',...
-%     'style','edit','pos',[.15 .55 .2 .07],'string',5,'fontsize',10);
-% conpanel.labels.npresstim = uicontrol('parent',modelfig.conpanel,'units','normalized',...
-%     'pos',[.05 .63 .4 .1],'style','text','HorizontalAlignment','center',...
-%     'string','Samples per (L,M) Value','fontsize',10);
-% conpanel.uicontrols.nRnds = uicontrol('parent',modelfig.conpanel,'units','normalized',...
-%     'style','edit','pos',[.15 .3 .2 .07],'string',3,'fontsize',10);
-% conpanel.labels.nRnds = uicontrol('parent',modelfig.conpanel,'units','normalized',...
-%     'pos',[.05 .38 .4 .1],'style','text','HorizontalAlignment','center',...
-%     'string','Rounds per Dataset','fontsize',10);
 conpanel.uicontrols.nDirs = uicontrol('parent',modelfig.conpanel,'units','normalized',...
     'style','edit','pos',[.65 .55 .2 .07],'string',30,'fontsize',10);
 conpanel.labels.nDirs = uicontrol('parent',modelfig.conpanel,'units','normalized',...
     'pos',[.55 .63 .4 .1],'style','text','HorizontalAlignment','center',...
     'string','# of preferred color directions','fontsize',10);
 
+% Set up controls for parameter values
 conpanel.uicontrols.upperA = uicontrol('parent',modelfig.conpanel,'units','normalized',...
     'style','edit','pos',[.15 .8 .2 .07],'string',50,'fontsize',10);
 conpanel.labels.upperA = uicontrol('parent',modelfig.conpanel,'units','normalized',...
@@ -62,6 +53,7 @@ conpanel.labels.kappa = uicontrol('parent',modelfig.conpanel,'units','normalized
     'pos',[.05 .12 .4 .1],'style','text','HorizontalAlignment','center',...
     'string','Kappa (variance)','fontsize',10);
 
+% Start button
 conpanel.uicontrols.startanalysis = uicontrol('parent',modelfig.conpanel,'style','pushbutton',...
     'units','normalized','pos',[.6 .05 .3 .15],'string','Start Analysis','fontsize',10,...
     'backgroundColor',[.2 1 .2],'callback',@StartAnalysis);
@@ -98,11 +90,11 @@ try
     
     % Plot the previously fit data
     axes(fitspanel.axes.LL); cla; hold on; grid on;
-    plot(angs,angdiffs,'ko')
     h = shadedErrorBar(angs,fitmean,fitstd,'r-');
     alpha(.5)
     h.edge(1).LineStyle = 'none';
     h.edge(2).LineStyle = 'none';
+    k = plot(angs,angdiffs,'ko','ButtonDownFcn',@DispDatasets);
     xlim([min(angs) max(angs)])
     
     % Fill in parameters from previous fits
@@ -118,7 +110,7 @@ try
 catch
     
     % If no previous data exists, propt the user to check the path.
-    disp('No previously modeled data found. Check conpanel.library path.')
+    disp('No previously modeled data found. Redirect the variable conpanel.library.')
 end
 
 % Save variables
@@ -130,7 +122,7 @@ set(gcf,'UserData',modelfig);
 end
 
 function StartAnalysis(~,~)
-global gl
+global gl data
 
 % Load variables
 modelfig = get(gcf,'UserData');
@@ -139,23 +131,29 @@ fitspanel = get(modelfig.fitspanel,'UserData');
 surfpanel = get(modelfig.surfpanel,'UserData');
 
 % GL struct stores experimental variables and tracks the progress of the model.
-%gl.nPres = str2double(get(conpanel.uicontrols.npresstim,'string'));
 gl.nPres = 5;
 gl.nSamps = str2double(get(conpanel.uicontrols.nsamps,'string'));
-%gl.nRnds = str2double(get(conpanel.uicontrols.nRnds,'string'));
 gl.nRnds = 3;
 npd = str2double(get(conpanel.uicontrols.nDirs,'string'));
 gl.allAngs = linspace(-pi/2,pi/2,npd);
 
-% Initialize field 'data' for model fit data.
-data.angs = gl.allAngs;
+% Fill in specified parameter values
+surfpanel.realparams = nan(1,8);
 surfpanel.realparams(1) = str2double(conpanel.uicontrols.upperA.String);
 surfpanel.realparams(6) = str2double(conpanel.uicontrols.baseline.String);
 surfpanel.realparams(5) = str2double(conpanel.uicontrols.exp.String);
-surfpanel.realparams(end) = str2double(conpanel.uicontrols.kappa.String);
+surfpanel.realparams(8) = str2double(conpanel.uicontrols.kappa.String);
+
+% Initialize structure 'data' for saving model fit data.
+data.angs = gl.allAngs;
 data.realparams = surfpanel.realparams;
 data.surftype = surfpanel.surftype;
 data.errortype = surfpanel.errortype;
+data.angdiff = nan(npd,gl.nSamps);
+data.params = cell(npd,gl.nSamps);
+data.LL = nan(npd,gl.nSamps);
+data.stim = cell(npd,gl.nSamps);
+data.resp = cell(npd,gl.nSamps);
 
 % Iterate through each angle and number of samples
 for rot = 1:numel(gl.allAngs)
@@ -178,6 +176,7 @@ for rot = 1:numel(gl.allAngs)
         
         % Load in figure variables
         fitspanel = get(modelfig.fitspanel,'UserData');
+        surfpanel = get(modelfig.surfpanel,'UserData');
         angdiff = fitspanel.params(end-1) - gl.allAngs(gl.currentAng);
         if angdiff > pi/2
             angdiff = angdiff - pi;
@@ -187,6 +186,8 @@ for rot = 1:numel(gl.allAngs)
         data.angdiff(gl.currentAng,gl.currentSamp) = angdiff;
         data.params{gl.currentAng,gl.currentSamp} = fitspanel.params;
         data.LL(gl.currentAng,gl.currentSamp) = fitspanel.LL;
+        data.stim{gl.currentAng,gl.currentSamp} = [surfpanel.Lcc surfpanel.Mcc];
+        data.resp{gl.currentAng,gl.currentSamp} = surfpanel.nsp;
         
     end
 end
@@ -202,13 +203,13 @@ fitstd = std(angdiffs,[],2);
 
 % Plot
 axes(fitspanel.axes.LL); cla; hold on; grid on;
-plot(angs,angdiffs,'ko')
 h = shadedErrorBar(angs,fitmean,fitstd,'r-');
 alpha(.5)
 h.edge(1).LineStyle = 'none';
 h.edge(2).LineStyle = 'none';
+k = plot(angs,angdiffs,'ko','ButtonDownFcn',@DispDatasets);
 xlim([min(angs) max(angs)])
-drawnow
+keyboard
 
 disp('Analysis finished.')
 
@@ -266,7 +267,7 @@ set(gcf,'UserData',modelfig);
 end
 
 function CreateModelSurface()
-global gl 
+global gl
 
 % Load Figure Variables
 modelfig = get(gcf,'UserData');
@@ -328,7 +329,7 @@ expguess = 2;
 blguess = min(nsp);
 kappaguess = 1;
 params = nan(numel(angs),numel(lb));
-guessIdx = fullfact([numel(sigguess) numel(angs)]); 
+guessIdx = fullfact([numel(sigguess) numel(angs)]);
 
 % Fit using a variety of initial guesses
 for rot = 1:size(guessIdx,1)
@@ -383,3 +384,73 @@ set(gcf,'UserData',modelfig);
 
 end
 
+function DispDatasets(a,b)
+global data
+
+% Grab current point before anything else
+whichpt = get(gca,'CurrentPoint');
+whichpt = whichpt(1,[1 2]);
+
+% Load Figure Variables
+modelfig = get(gcf,'UserData');
+surfpanel = get(modelfig.surfpanel,'UserData');
+fitspanel = get(modelfig.fitspanel,'UserData');
+
+% Organize and express in degrees
+angs = data.angs./pi*180;
+angdiffs = data.angdiff./pi*180;
+fitmean = mean(angdiffs,2);
+fitstd = std(angdiffs,[],2);
+
+% Which datafile corresponds to selected point?
+[~,PDidx] = min(abs(whichpt(1)-angs));
+[~,sampIdx] = min(abs(whichpt(2)-angdiffs(PDidx,:)));
+
+% Plot the previously fit data
+axes(fitspanel.axes.LL); cla; hold on; grid on;
+h = shadedErrorBar(angs,fitmean,fitstd,'r-');
+alpha(.5)
+h.edge(1).LineStyle = 'none';
+h.edge(2).LineStyle = 'none';
+plot(angs,angdiffs,'ko','ButtonDownFcn',@DispDatasets);
+plot(angs(PDidx),angdiffs(PDidx,sampIdx),'r*');
+xlim([min(angs) max(angs)])
+
+% Load saved data for chosen stimulus set
+nsp = data.resp{PDidx,sampIdx};
+params = data.params{PDidx,sampIdx};
+stim = data.stim{PDidx,sampIdx};
+Lcc = stim(:,1);
+Mcc = stim(:,2);
+
+% Calculate surface
+x = linspace(-max(Lcc),max(Lcc),50);
+[xx,yy] = meshgrid(x,x);
+surface = ComputeNakaRushtonJPW(params,[xx(:) yy(:)],surfpanel.surftype);
+surface = reshape(surface,size(xx));
+
+% Plot current dataset
+axes(surfpanel.axes); 
+prevview = get(gca,'view');
+cla; hold on; grid on;
+Lcc = stim(:,1);
+Mcc = stim(:,2);
+uniquestim = unique([Lcc Mcc],'rows');
+maxnsp = max(nsp);
+for i = 1:size(uniquestim,1)
+    L = Lcc == uniquestim(i,1) &  Mcc == uniquestim(i,2);
+    mn = mean(nsp(L))/maxnsp*10;
+    h = plot3(uniquestim(i,1),uniquestim(i,2),mean(nsp(L)),'ko');
+    set(h,'MarkerFaceColor','black','MarkerSize',max([2*mn 0]+4),'MarkerEdgeColor','none')
+end
+h = surfc(xx,yy,surface);
+set(h(1),'edgecolor','none')
+alpha(.5);
+set(gca,'view',prevview);
+xlabel('L-cone contrast');
+ylabel('M-cone contrast');
+zlabel('# of spikes');
+
+
+
+end
