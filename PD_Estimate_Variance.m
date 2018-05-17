@@ -9,7 +9,7 @@ global data
 
 % Set up figure
 figure(1000); clf;
-set(gcf,'units','normalized','pos',[.2 .2 .6 .6],'NumberTitle','off',...
+set(gcf,'units','normalized','pos',[.25 .2 .5 .6],'NumberTitle','off',...
     'Name','Variance of Tuning Model');
 modelfig = get(gcf,'UserData');
 modelfig.conpanel = uipanel('pos',[.525 .525 .45 .45],'parent',gcf,'title','Control Panel');
@@ -21,14 +21,14 @@ fitspanel = get(modelfig.fitspanel,'UserData');
 
 % Set up controls for analysis
 conpanel.uicontrols.nsamps = uicontrol('style','edit','parent',modelfig.conpanel,...
-    'units','normalized','pos',[.65 .8 .2 .07],'string',10,'fontsize',10);
+    'units','normalized','pos',[.65 .7 .2 .07],'string',10,'fontsize',10);
 conpanel.labels.nsamps = uicontrol('Parent',modelfig.conpanel,'Units','normalized',...
-    'pos',[.55 .88 .4 .1],'HorizontalAlignment','center',...
+    'pos',[.55 .8 .4 .15],'HorizontalAlignment','center',...
     'style','text','string','Samples/preferred direction','FontSize',10);
 conpanel.uicontrols.nDirs = uicontrol('parent',modelfig.conpanel,'units','normalized',...
-    'style','edit','pos',[.65 .55 .2 .07],'string',30,'fontsize',10);
+    'style','edit','pos',[.65 .35 .2 .07],'string',30,'fontsize',10);
 conpanel.labels.nDirs = uicontrol('parent',modelfig.conpanel,'units','normalized',...
-    'pos',[.55 .63 .4 .1],'style','text','HorizontalAlignment','center',...
+    'pos',[.55 .45 .4 .15],'style','text','HorizontalAlignment','center',...
     'string','# of preferred color directions','fontsize',10);
 
 % Set up controls for parameter values
@@ -58,13 +58,12 @@ conpanel.uicontrols.startanalysis = uicontrol('parent',modelfig.conpanel,'style'
     'units','normalized','pos',[.6 .05 .3 .15],'string','Start Analysis','fontsize',10,...
     'backgroundColor',[.2 1 .2],'callback',@StartAnalysis);
 
-% Set up library. Point to a place you want to save the model data.
-conpanel.library = '/Users/jpatrickweller/Dropbox/Patrick/GLMS Data/';
-
 % Set up surfpanel
-surfpanel.axes = axes('parent',modelfig.surfpanel,'units','normalized','pos',[.15 .15 .8 .8],...
+surfpanel.axes = axes('parent',modelfig.surfpanel,'units','normalized','pos',[.15 .2 .7 .7],...
     'tickdir','out');
 axis square; box on;
+xlabel('L-cone contrast')
+ylabel('M-cone contrast')
 surfpanel.surftype = 'conicsection_xy';
 surfpanel.errortype = 'NegativeBinomial';
 upperA = str2double(conpanel.uicontrols.upperA.String);
@@ -75,12 +74,14 @@ surfpanel.realparams = [upperA nan 0 0 exp baseline nan kappa];
 
 % Set up fitspanel
 fitspanel.axes.LL = axes('parent',modelfig.fitspanel,'units','normalized',...
-    'pos',[.1 .1 .8 .8],'box','on','xlim',[-pi/2 pi/2],'tickdir','out');
+    'pos',[.1 .2 .8 .7],'box','on','xlim',[-pi/2 pi/2],'tickdir','out');
+xlabel('Preferred Direction (deg)')
+ylabel('PD Estimate Error (deg)')
 
 try
     
     % Try to load previously saved data
-    load([conpanel.library 'Model data'],'data')
+    load('PD Est Var Model data','data')
 
     % Organize and express in degrees
     angs = data.angs./pi*180;
@@ -94,8 +95,11 @@ try
     alpha(.5)
     h.edge(1).LineStyle = 'none';
     h.edge(2).LineStyle = 'none';
-    k = plot(angs,angdiffs,'ko','ButtonDownFcn',@DispDatasets);
+    plot(angs,angdiffs,'ko','ButtonDownFcn',@DispDatasets);
     xlim([min(angs) max(angs)])
+    xlabel('Preferred Direction (deg)')
+    ylabel('PD Estimate Error (deg)')
+
     
     % Fill in parameters from previous fits
     set(conpanel.uicontrols.upperA,'string',data.realparams(1))
@@ -110,7 +114,7 @@ try
 catch
     
     % If no previous data exists, propt the user to check the path.
-    disp('No previously modeled data found. Redirect the variable conpanel.library.')
+    disp('No previously modeled data found.')
 end
 
 % Save variables
@@ -193,7 +197,7 @@ for rot = 1:numel(gl.allAngs)
 end
 
 disp('Saving data...')
-save([conpanel.library 'Model data'],'data')
+save('PD Est Var Model data','data')
 
 % Organize and express in degrees
 angs = data.angs./pi*180;
@@ -207,9 +211,10 @@ h = shadedErrorBar(angs,fitmean,fitstd,'r-');
 alpha(.5)
 h.edge(1).LineStyle = 'none';
 h.edge(2).LineStyle = 'none';
-k = plot(angs,angdiffs,'ko','ButtonDownFcn',@DispDatasets);
+plot(angs,angdiffs,'ko','ButtonDownFcn',@DispDatasets);
 xlim([min(angs) max(angs)])
-keyboard
+xlabel('Preferred Direction (deg)')
+ylabel('PD Estimate Error (deg)')
 
 disp('Analysis finished.')
 
@@ -384,7 +389,7 @@ set(gcf,'UserData',modelfig);
 
 end
 
-function DispDatasets(a,b)
+function DispDatasets(~,~)
 global data
 
 % Grab current point before anything else
@@ -415,6 +420,9 @@ h.edge(2).LineStyle = 'none';
 plot(angs,angdiffs,'ko','ButtonDownFcn',@DispDatasets);
 plot(angs(PDidx),angdiffs(PDidx,sampIdx),'r*');
 xlim([min(angs) max(angs)])
+xlabel('Preferred Direction (deg)')
+ylabel('PD Estimate Error (deg)')
+
 
 % Load saved data for chosen stimulus set
 nsp = data.resp{PDidx,sampIdx};
